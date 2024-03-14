@@ -56,29 +56,31 @@
 #include "mpi_connector_api.h"
 #include "k_autoconf_comm.h"
 
-
+/***************************unfixed：不同AI Demo可能需要修改*******************/
 #if defined(CONFIG_BOARD_K230_CANMV)
-#define SENSOR_CHANNEL (3)     // isp通道数
-#define SENSOR_HEIGHT (720)  // isp高度，ai输入，竖屏
-#define SENSOR_WIDTH (1280)    // isp宽度，ai输入，竖屏
-#define ISP_CHN0_WIDTH  (1920)//(1920)
-#define ISP_CHN0_HEIGHT (1080)//(1080)
+#define SENSOR_CHANNEL (3)                // 通道数
+#define SENSOR_HEIGHT (720)               // sensor ch1输出高度，AI输入
+#define SENSOR_WIDTH (1280)               // sensor ch1输出宽度，AI输入
+#define ISP_CHN0_WIDTH  (1920)            // sensor ch0输出宽度，vo
+#define ISP_CHN0_HEIGHT (1080)            // sensor ch0输出高度，vo
 #define vicap_install_osd                   (1)
 #define osd_id                              K_VO_OSD3
 #define osd_width                           (1920)
 #define osd_height                          (1080)
 #else
-#define SENSOR_CHANNEL (3)     // isp通道数
-#define SENSOR_HEIGHT (1280)  // isp高度，ai输入，竖屏
-#define SENSOR_WIDTH (720)    // isp宽度，ai输入，竖屏
-#define ISP_CHN0_WIDTH  (1088)//(1920)
-#define ISP_CHN0_HEIGHT (1920)//(1080)
+#define SENSOR_CHANNEL (3)                
+#define SENSOR_HEIGHT (1280)  
+#define SENSOR_WIDTH (720)   
+#define ISP_CHN0_WIDTH  (1088)
+#define ISP_CHN0_HEIGHT (1920)
 #define vicap_install_osd                   (1)
 #define osd_id                              K_VO_OSD3
 #define osd_width                           (1080)
 #define osd_height                          (1920)
 #endif
+/*****************************************************************************/    
 
+/***************************fixed：无需修改***********************************/
 k_vb_config config;
 k_vicap_dev vicap_dev;
 k_vicap_chn vicap_chn;
@@ -624,3 +626,4 @@ void yuv_rotate_90(char *des, char *src,int width,int height)
     }
 
 }
+/****************************************************************************/

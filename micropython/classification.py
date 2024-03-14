@@ -9,6 +9,7 @@ import time                              #时间统计
 import gc                                #垃圾回收模块
 import os, sys                           #操作系统接口模块
 
+#***************************unfixed：不同AI Demo可能需要修改******************
 #显示分辨率
 DISPLAY_WIDTH = ALIGN_UP(1920, 16)
 DISPLAY_HEIGHT = 1080
@@ -16,9 +17,11 @@ DISPLAY_HEIGHT = 1080
 #AI分辨率
 OUT_RGB888P_WIDTH = ALIGN_UP(224, 16)
 OUT_RGB888P_HEIGH = 224
+#*****************************************************************************
 
 debug_mode=0
 
+#***************************fixed：无需修改***********************************
 class ScopedTiming:
     def __init__(self, info="", enable_profile=True):
         self.info = info
@@ -34,16 +37,10 @@ class ScopedTiming:
             elapsed_time = time.time_ns() - self.start_time
             print(f"{self.info} took {elapsed_time / 1000000:.2f} ms")
 
-# 任务后处理
-def softmax(x):
-    exp_x = np.exp(x - np.max(x))
-    return exp_x / np.sum(exp_x)
-
-#********************for media_utils.py********************
 global draw_img,osd_img                                     #for display
 global buffer,media_source,media_sink                       #for media
 
-# for display，已经封装好，无需自己再实现，直接调用即可，详细解析请查看1.6.2
+# for display
 def display_init():
     # hdmi显示初始化
     display.init(LT9611_1920X1080_30FPS)
@@ -52,15 +49,20 @@ def display_init():
 def display_deinit():
     # 释放显示资源
     display.deinit()
+#*****************************************************************************
 
 def display_draw(label):
     # hdmi写文字
     with ScopedTiming("display_draw",debug_mode >0):
         global draw_img,osd_img
 
+        #******************unfixed：不同AI Demo可能需要修改******************
         if label:
+        #********************************************************************
             draw_img.clear()
+            #******************unfixed：不同AI Demo可能需要修改******************
             draw_img.draw_string(5,5,label,scale=5,color=(255,0,255,0))
+            #*****************************************************************
             draw_img.copy_to(osd_img)
             display.show_image(osd_img, 0, 0, DISPLAY_CHN_OSD3)
         else:
@@ -68,6 +70,7 @@ def display_draw(label):
             draw_img.copy_to(osd_img)
             display.show_image(osd_img, 0, 0, DISPLAY_CHN_OSD3)
 
+#***************************fixed：无需修改***********************************
 #for camera
 def camera_init(dev_id):
     # 设置摄像头类型
@@ -144,17 +147,27 @@ def media_deinit():
         media.destroy_link(media_source, media_sink)
 
     media.buffer_deinit()
+#**************************************************************************
+
+#***************************unfixed：不同AI Demo可能需要修改******************
+# 任务后处理
+def softmax(x):
+    exp_x = np.exp(x - np.max(x))
+    return exp_x / np.sum(exp_x)
+#**************************************************************************
 
 def classification():
     print("start")
-
+    #***************************unfixed：不同AI Demo可能需要修改******************
     # 初始化参数
     kmodel_file = '/sdcard/k230_classify.kmodel'
     labels = ["bocai","changqiezi","huluobo","xihongshi","xilanhua"]
     confidence_threshold = 0.6
     num_classes= 5
     cls_idx=-1
+    #***************************************************************************
 
+    #***************************fixed：无需修改***********************************
     # 加载kmodel
     kpu = nn.kpu()
     kpu.load_kmodel(kmodel_file)
@@ -174,8 +187,10 @@ def classification():
             with ScopedTiming("total",debug_mode > 0):
                 # 从摄像头拿取一帧数据
                 rgb888p_img = camera_read(CAM_DEV_ID_0)
+    #***************************************************************************
                 # for rgb888planar
                 if rgb888p_img.format() == image.RGBP888:
+                    #******************unfixed：不同AI Demo可能需要修改*****************
                     # rgb888（uint8,chw,rgb）->kmodel input（uint8,hwc,rgb）
                     # pre_process : chw -> hwc
                     ori_img_numpy = rgb888p_img.to_numpy_ref()
@@ -186,7 +201,9 @@ def classification():
                     img_res=img_tmp_trans.copy()
                     img_hwc=img_res.reshape((1,shape[1],shape[2],shape[0]))
                     input_tensor = nn.from_numpy(img_hwc)
+                    #*****************************************************************
 
+                    #************************fixed：无需修改*****************************
                     # set kmodel input
                     kpu.set_input_tensor(0, input_tensor)
 
@@ -200,7 +217,9 @@ def classification():
                         result = output_tensor.to_numpy()
                         del output_tensor
                         results.append(result)
+                    #*****************************************************************
 
+                    #******************unfixed：不同AI Demo可能需要修改******************
                     # post process
                     softmax_res=softmax(results[0][0])
                     res_idx=np.argmax(softmax_res)
@@ -212,18 +231,23 @@ def classification():
                     else:
                         cls_idx=-1
 
+
                 # draw result
                 if cls_idx>=0:
                     display_draw(labels[res_idx])
                 else:
                     display_draw(None)
+                #******************************************************************
 
-                # release image
                 del input_tensor
+                #************************fixed：无需修改*****************************
+                # release image
                 camera_release_image(CAM_DEV_ID_0,rgb888p_img)
                 # release gc
                 gc.collect()
                 nn.shrink_memory_pool()
+                #********************************************************************
+    #************************fixed：无需修改*****************************
     except KeyboardInterrupt as e:
         print("user stop: ", e)
     except BaseException as e:
@@ -231,15 +255,20 @@ def classification():
     finally:
         camera_stop(CAM_DEV_ID_0)
         display_deinit()
-        del kpu
+    #******************************************************************
+        del kpu                   #根据实际名称修改
+    #************************fixed：无需修改*****************************
         gc.collect()
         nn.shrink_memory_pool()
         media_deinit()
+    #******************************************************************
     print("end")
     return 0
 
 
 if __name__=="__main__":
+    #************************fixed：无需修改*****************************
     os.exitpoint(os.EXITPOINT_ENABLE)
     nn.shrink_memory_pool()
+    #******************************************************************
     classification()
