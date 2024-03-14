@@ -58,10 +58,8 @@ std::atomic<bool> isp_stop(false);
 
 void video_proc_cls(char *argv[])
 {
-    // sensor start
-    //sensor有2路输出，
-    //第0路用于显示，输出大小设置1080p,图像格式为PIXEL_FORMAT_YVU_PLANAR_420,直接绑定到vo
-    //第1路用于AI计算，输出大小720p,图像格式为PIXEL_FORMAT_BGR_888_PLANAR（实际为rgb,chw,uint8）
+    
+    /***************************fixed：无需修改***********************************/
     vivcap_start();
 
     // osd set
@@ -86,14 +84,16 @@ void video_proc_cls(char *argv[])
         std::cerr << "physical_memory_block::allocate failed: ret = " << ret << ", errno = " << strerror(errno) << std::endl;
         std::abort();
     }
+    /*****************************************************************************/ 
 
     string kmodel_path = argv[1];
     cout<<"kmodel_path : "<<kmodel_path<<endl;
     float cls_thresh=0.5;
 
-    // kmodel解释器，从kmodel文件构建，负责模型的加载、输入输出设置和推理
+    /***************************fixed：无需修改***********************************/
+    // 我们已经把相关实现封装到ai_base.cc，这里只是为了介绍起来比较简单
     interpreter kmodel_interp;        
-   // 1. load model
+    // load model
     std::ifstream ifs(kmodel_path, std::ios::binary);
     kmodel_interp.load_model(ifs).expect("Invalid kmodel");
 
@@ -117,7 +117,8 @@ void video_proc_cls(char *argv[])
         auto tensor = host_runtime_tensor::create(desc.datatype, shape, hrt::pool_shared).expect("cannot create output tensor");
         kmodel_interp.output_tensor(i, tensor).expect("cannot set output tensor");
     }
-    
+    /*****************************************************************************/ 
+
     vector<cls_res> results;
     std::vector<std::string> labels = {"bocai","changqiezi","huluobo","xihongshi","xilanhua"};
     
@@ -126,6 +127,7 @@ void video_proc_cls(char *argv[])
         cv::Mat ori_img;
         //sensor to cv::Mat
         {
+            /***************************fixed：无需修改***********************************/
             //从摄像头读取一帧图像
             memset(&dump_info, 0 , sizeof(k_video_frame_info));
             ret = kd_mpi_vicap_dump_frame(vicap_dev, VICAP_CHN_ID_1, VICAP_DUMP_YUV, &dump_info, 1000);
@@ -134,10 +136,11 @@ void video_proc_cls(char *argv[])
                 continue;
             }
 
-            //将摄像头当前帧对应DDR地址映射到当前程序进行访问
+            //将摄像头当前帧对应DDR地址映射到当前系统进行访问
             auto vbvaddr = kd_mpi_sys_mmap_cached(dump_info.v_frame.phys_addr[0], size);
             memcpy(vaddr, (void *)vbvaddr, SENSOR_HEIGHT * SENSOR_WIDTH * 3); 
             kd_mpi_sys_munmap(vbvaddr, size);
+            /*****************************************************************************/ 
             
             //将摄像头数据转换为为cv::Mat,sensor（rgb,chw）->cv::Mat（bgr，hwc）
             cv::Mat image_r = cv::Mat(SENSOR_HEIGHT,SENSOR_WIDTH, CV_8UC1, vaddr);
@@ -151,6 +154,7 @@ void video_proc_cls(char *argv[])
             cv::merge(color_vec, ori_img);
         }
 
+        /***************************unfixed：不同AI Demo可能需要修改******************/
         // pre_process
         cv::Mat pre_process_img;
         {
@@ -158,7 +162,9 @@ void video_proc_cls(char *argv[])
             cv::cvtColor(ori_img, rgb_img, cv::COLOR_BGR2RGB);
             cv::resize(rgb_img, pre_process_img, cv::Size(kmodel_input_width, kmodel_input_height), cv::INTER_LINEAR);
         }
+        /*****************************************************************************/  
 
+        /***************************fixed：无需修改***********************************/
         // set kmodel input
         {
             runtime_tensor tensor0 = kmodel_interp.input_tensor(0).expect("cannot get input tensor");
@@ -166,6 +172,7 @@ void video_proc_cls(char *argv[])
             memcpy(reinterpret_cast<unsigned char *>(in_buf.data()), pre_process_img.data,sizeof(uint8_t)* kmodel_input_height * kmodel_input_width * 3);
             hrt::sync(tensor0, sync_op_t::sync_write_back, true).expect("sync write_back failed");
         }
+        
 
         // kmodel run
         kmodel_interp.run().expect("error occurred in running model");
@@ -181,7 +188,9 @@ void video_proc_cls(char *argv[])
                 k_outputs.push_back(p_out);
             }
         }
+        /***************************fixed：无需修改***********************************/
 
+        /***************************unfixed：不同AI Demo可能需要修改******************/
         //post process
         results.clear();
         {
@@ -206,13 +215,14 @@ void video_proc_cls(char *argv[])
                 results.push_back(b);
             }
         }
+        /*****************************************************************************/    
 
         // draw result to vo
         {
-            // draw osd
             {
                 cv::Mat osd_frame(osd_height, osd_width, CV_8UC4, cv::Scalar(0, 0, 0, 0));
                 {
+                    /***************************unfixed：不同AI Demo可能需要修改******************/
                     //draw cls
                     double fontsize = (osd_frame.cols * osd_frame.rows * 1.0) / (1100 * 1200);
                     for(int i = 0; i < results.size(); i++)
@@ -223,7 +233,10 @@ void video_proc_cls(char *argv[])
 
                         std::cout << text << std::endl;
                     }
+                    /*****************************************************************************/
                 }
+
+                /***************************fixed：无需修改***********************************/
                 memcpy(pic_vaddr, osd_frame.data, osd_width * osd_height * 4);
             }
 
@@ -232,6 +245,7 @@ void video_proc_cls(char *argv[])
                 kd_mpi_vo_chn_insert_frame(osd_id+3, &vf_info);  //K_VO_OSD0
                 printf("kd_mpi_vo_chn_insert_frame success \n");
             }
+            
         }
         
         {
@@ -241,8 +255,10 @@ void video_proc_cls(char *argv[])
                 printf("sample_vicap...kd_mpi_vicap_dump_release failed.\n");
             }
         }
+        /*****************************************************************************/ 
     }
-
+    
+    /***************************fixed：无需修改***********************************/
     vo_osd_release_block();
     vivcap_stop();
 
@@ -253,6 +269,7 @@ void video_proc_cls(char *argv[])
         std::cerr << "free failed: ret = " << ret << ", errno = " << strerror(errno) << std::endl;
         std::abort();
     }
+    /*****************************************************************************/ 
 }
 
 int main(int argc, char *argv[])
@@ -269,6 +286,7 @@ int main(int argc, char *argv[])
         return -1;
     }
 
+    /***************************fixed：无需修改***********************************/
     std::thread thread_isp(video_proc_cls, argv);
     while (getchar() != 'q')
     {
@@ -277,6 +295,6 @@ int main(int argc, char *argv[])
 
     isp_stop = true;
     thread_isp.join();
-
+    /*****************************************************************************/ 
     return 0;
 }
